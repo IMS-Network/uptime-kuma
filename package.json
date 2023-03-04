@@ -172,7 +172,7 @@
         "vite": "~3.1.0",
         "vite-plugin-compression": "^0.5.1",
         "vue": "next",
-        "vue-chart-3": "3.0.9",
+        "vue-chart-3": "3.1.8",
         "vue-confirm-dialog": "~1.0.2",
         "vue-contenteditable": "~3.0.4",
         "vue-i18n": "~9.2.2",
