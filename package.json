@@ -117,7 +117,7 @@
         "protobufjs": "~7.1.1",
         "qs": "~6.10.4",
         "redbean-node": "~0.2.0",
-        "redis": "~4.5.1",
+        "redis": "~4.6.5",
         "socket.io": "~4.5.3",
         "socket.io-client": "~4.5.3",
         "socks-proxy-agent": "6.1.1",
