@@ -24,6 +24,9 @@
                                         <option value="ping">
                                             Ping
                                         </option>
+                                        <option value="snmp">
+                                            SNMP
+                                        </option>
                                         <option value="keyword">
                                             HTTP(s) - {{ $t("Keyword") }}
                                         </option>
@@ -144,18 +147,28 @@
                                 </div>
                             </div>
 
-                            <!-- Json Query -->
-                            <div v-if="monitor.type === 'json-query'" class="my-3">
-                                <label for="jsonPath" class="form-label">{{ $t("Json Query") }}</label>
-                                <input id="jsonPath" v-model="monitor.jsonPath" type="text" class="form-control" required>
-
-                                <!-- eslint-disable-next-line vue/no-v-html -->
-                                <div class="form-text" v-html="$t('jsonQueryDescription')">
+                            <!-- Remote Browser -->
+                            <div v-if="monitor.type === 'real-browser'" class="my-3">
+                                <!-- Toggle -->
+                                <div class="my-3 form-check">
+                                    <input id="toggle" v-model="remoteBrowsersToggle" class="form-check-input" type="checkbox">
+                                    <label class="form-check-label" for="toggle">
+                                        {{ $t("useRemoteBrowser") }}
+                                    </label>
+                                    <div class="form-text">
+                                        {{ $t("remoteBrowserToggle") }}
+                                    </div>
                                 </div>
-                                <br>
 
-                                <label for="expectedValue" class="form-label">{{ $t("Expected Value") }}</label>
-                                <input id="expectedValue" v-model="monitor.expectedValue" type="text" class="form-control" required>
+                                <div v-if="remoteBrowsersToggle">
+                                    <label for="remote-browser" class="form-label">{{ $t("Remote Browser") }}</label>
+                                    <ActionSelect
+                                        v-model="monitor.remote_browser"
+                                        :options="remoteBrowsersOptions"
+                                        icon="plus"
+                                        :action="() => $refs.remoteBrowserDialog.show()"
+                                    />
+                                </div>
                             </div>
 
                             <!-- Game -->
@@ -221,17 +234,77 @@
                             </template>
 
                             <!-- Hostname -->
-                            <!-- TCP Port / Ping / DNS / Steam / MQTT / Radius / Tailscale Ping only -->
-                            <div v-if="monitor.type === 'port' || monitor.type === 'ping' || monitor.type === 'dns' || monitor.type === 'steam' || monitor.type === 'gamedig' ||monitor.type === 'mqtt' || monitor.type === 'radius' || monitor.type === 'tailscale-ping'" class="my-3">
+                            <!-- TCP Port / Ping / DNS / Steam / MQTT / Radius / Tailscale Ping / SNMP only -->
+                            <div v-if="monitor.type === 'port' || monitor.type === 'ping' || monitor.type === 'dns' || monitor.type === 'steam' || monitor.type === 'gamedig' || monitor.type === 'mqtt' || monitor.type === 'radius' || monitor.type === 'tailscale-ping' || monitor.type === 'snmp'" class="my-3">
                                 <label for="hostname" class="form-label">{{ $t("Hostname") }}</label>
                                 <input id="hostname" v-model="monitor.hostname" type="text" class="form-control" :pattern="`${monitor.type === 'mqtt' ? mqttIpOrHostnameRegexPattern : ipOrHostnameRegexPattern}`" required>
                             </div>
 
                             <!-- Port -->
-                            <!-- For TCP Port / Steam / MQTT / Radius Type -->
-                            <div v-if="monitor.type === 'port' || monitor.type === 'steam' || monitor.type === 'gamedig' || monitor.type === 'mqtt' || monitor.type === 'radius'" class="my-3">
+                            <!-- For TCP Port / Steam / MQTT / Radius Type / SNMP -->
+                            <div v-if="monitor.type === 'port' || monitor.type === 'steam' || monitor.type === 'gamedig' || monitor.type === 'mqtt' || monitor.type === 'radius' || monitor.type === 'snmp'" class="my-3">
                                 <label for="port" class="form-label">{{ $t("Port") }}</label>
                                 <input id="port" v-model="monitor.port" type="number" class="form-control" required min="0" max="65535" step="1">
+                            </div>
+
+                            <!-- SNMP Monitor Type -->
+                            <div v-if="monitor.type === 'snmp'" class="my-3">
+                                <label for="snmp_community_string" class="form-label">{{ $t("Community String") }}</label>
+                                <!-- TODO: Rename monitor.radiusPassword to monitor.password for general use -->
+                                <HiddenInput id="snmp_community_string" v-model="monitor.radiusPassword" autocomplete="false" required="true" placeholder="public"></HiddenInput>
+
+                                <div class="form-text">{{ $t('snmpCommunityStringHelptext') }}</div>
+                            </div>
+
+                            <div v-if="monitor.type === 'snmp'" class="my-3">
+                                <label for="snmp_oid" class="form-label">{{ $t("OID (Object Identifier)") }}</label>
+                                <input id="snmp_oid" v-model="monitor.snmpOid" :title="$t('Please enter a valid OID.') + ' ' + $t('Example:', ['1.3.6.1.4.1.9.6.1.101'])" type="text" class="form-control" pattern="^([0-2])((\.0)|(\.[1-9][0-9]*))*$" placeholder="1.3.6.1.4.1.9.6.1.101" required>
+                                <div class="form-text">{{ $t('snmpOIDHelptext') }} </div>
+                            </div>
+
+                            <div v-if="monitor.type === 'snmp'" class="my-3">
+                                <label for="snmp_version" class="form-label">{{ $t("SNMP Version") }}</label>
+                                <select id="snmp_version" v-model="monitor.snmpVersion" class="form-select">
+                                    <option value="1">
+                                        SNMPv1
+                                    </option>
+                                    <option value="2c">
+                                        SNMPv2c
+                                    </option>
+                                </select>
+                            </div>
+
+                            <!-- Json Query -->
+                            <!-- For Json Query / SNMP -->
+                            <div v-if="monitor.type === 'json-query' || monitor.type === 'snmp'" class="my-3">
+                                <div class="my-2">
+                                    <label for="jsonPath" class="form-label mb-0">{{ $t("Json Query Expression") }}</label>
+                                    <i18n-t tag="div" class="form-text mb-2" keypath="jsonQueryDescription">
+                                        <a href="https://jsonata.org/">jsonata.org</a>
+                                        <a href="https://try.jsonata.org/">{{ $t('playground') }}</a>
+                                    </i18n-t>
+                                    <input id="jsonPath" v-model="monitor.jsonPath" type="text" class="form-control" placeholder="$" required>
+                                </div>
+
+                                <div class="d-flex align-items-start">
+                                    <div class="me-2">
+                                        <label for="json_path_operator" class="form-label">{{ $t("Condition") }}</label>
+                                        <select id="json_path_operator" v-model="monitor.jsonPathOperator" class="form-select me-3" required>
+                                            <option value=">">&gt;</option>
+                                            <option value=">=">&gt;=</option>
+                                            <option value="<">&lt;</option>
+                                            <option value="<=">&lt;=</option>
+                                            <option value="!=">&#33;=</option>
+                                            <option value="==">==</option>
+                                            <option value="contains">contains</option>
+                                        </select>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <label for="expectedValue" class="form-label">{{ $t("Expected Value") }}</label>
+                                        <input v-if="monitor.jsonPathOperator !== 'contains' && monitor.jsonPathOperator !== '==' && monitor.jsonPathOperator !== '!='" id="expectedValue" v-model="monitor.expectedValue" type="number" class="form-control" required step=".01">
+                                        <input v-else id="expectedValue" v-model="monitor.expectedValue" type="text" class="form-control" required>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- DNS Resolver Server -->
@@ -288,22 +361,19 @@
                             <!-- Docker Host -->
                             <!-- For Docker Type -->
                             <div v-if="monitor.type === 'docker'" class="my-3">
-                                <h2 class="mb-2">{{ $t("Docker Host") }}</h2>
-                                <p v-if="$root.dockerHostList.length === 0">
-                                    {{ $t("Not available, please setup.") }}
-                                </p>
-
-                                <div v-else class="mb-3">
+                                <div class="mb-3">
                                     <label for="docker-host" class="form-label">{{ $t("Docker Host") }}</label>
-                                    <select id="docket-host" v-model="monitor.docker_host" class="form-select">
-                                        <option v-for="host in $root.dockerHostList" :key="host.id" :value="host.id">{{ host.name }}</option>
-                                    </select>
-                                    <a href="#" @click="$refs.dockerHostDialog.show(monitor.docker_host)">{{ $t("Edit") }}</a>
+                                    <ActionSelect
+                                        id="docker-host"
+                                        v-model="monitor.docker_host"
+                                        :action-aria-label="$t('openModalTo', $t('Setup Docker Host'))"
+                                        :options="dockerHostOptionsList"
+                                        :disabled="$root.dockerHostList == null || $root.dockerHostList.length === 0"
+                                        :icon="'plus'"
+                                        :action="() => $refs.dockerHostDialog.show()"
+                                        :required="true"
+                                    />
                                 </div>
-
-                                <button class="btn btn-primary me-2" type="button" @click="$refs.dockerHostDialog.show()">
-                                    {{ $t("Setup Docker Host") }}
-                                </button>
                             </div>
 
                             <!-- MQTT -->
@@ -328,11 +398,34 @@
                                 </div>
 
                                 <div class="my-3">
-                                    <label for="mqttSuccessMessage" class="form-label">MQTT {{ $t("successMessage") }}</label>
-                                    <input id="mqttSuccessMessage" v-model="monitor.mqttSuccessMessage" type="text" class="form-control">
+                                    <label for="mqttCheckType" class="form-label">MQTT {{ $t("Check Type") }}</label>
+                                    <select id="mqttCheckType" v-model="monitor.mqttCheckType" class="form-select" required>
+                                        <option value="keyword">{{ $t("Keyword") }}</option>
+                                        <option value="json-query">{{ $t("Json Query") }}</option>
+                                    </select>
+                                </div>
+
+                                <div v-if="monitor.mqttCheckType === 'keyword'" class="my-3">
+                                    <label for="mqttSuccessKeyword" class="form-label">MQTT {{ $t("successKeyword") }}</label>
+                                    <input id="mqttSuccessKeyword" v-model="monitor.mqttSuccessMessage" type="text" class="form-control">
                                     <div class="form-text">
-                                        {{ $t("successMessageExplanation") }}
+                                        {{ $t("successKeywordExplanation") }}
                                     </div>
+                                </div>
+
+                                <!-- Json Query -->
+                                <div v-if="monitor.mqttCheckType === 'json-query'" class="my-3">
+                                    <label for="jsonPath" class="form-label">{{ $t("Json Query") }}</label>
+                                    <input id="jsonPath" v-model="monitor.jsonPath" type="text" class="form-control" required>
+
+                                    <i18n-t tag="div" class="form-text" keypath="jsonQueryDescription">
+                                        <a href="https://jsonata.org/">jsonata.org</a>
+                                        <a href="https://try.jsonata.org/">{{ $t('here') }}</a>
+                                    </i18n-t>
+                                    <br>
+
+                                    <label for="expectedValue" class="form-label">{{ $t("Expected Value") }}</label>
+                                    <input id="expectedValue" v-model="monitor.expectedValue" type="text" class="form-control" required>
                                 </div>
                             </template>
 
@@ -373,11 +466,46 @@
                                     <input id="connectionString" v-model="monitor.databaseConnectionString" type="text" class="form-control" required>
                                 </div>
                             </template>
+
+                            <template v-if="monitor.type === 'mysql'">
+                                <div class="my-3">
+                                    <label for="mysql-password" class="form-label">{{ $t("Password") }}</label>
+                                    <!-- TODO: Rename monitor.radiusPassword to monitor.password for general use -->
+                                    <HiddenInput id="mysql-password" v-model="monitor.radiusPassword" autocomplete="false"></HiddenInput>
+                                </div>
+                            </template>
+
                             <!-- SQL Server / PostgreSQL / MySQL -->
                             <template v-if="monitor.type === 'sqlserver' || monitor.type === 'postgres' || monitor.type === 'mysql'">
                                 <div class="my-3">
                                     <label for="sqlQuery" class="form-label">{{ $t("Query") }}</label>
-                                    <textarea id="sqlQuery" v-model="monitor.databaseQuery" class="form-control" :placeholder="$t('Example:', [ 'select getdate()' ])" required></textarea>
+                                    <textarea id="sqlQuery" v-model="monitor.databaseQuery" class="form-control" :placeholder="$t('Example:', [ 'SELECT 1' ])"></textarea>
+                                </div>
+                            </template>
+
+                            <!-- MongoDB -->
+                            <template v-if="monitor.type === 'mongodb'">
+                                <div class="my-3">
+                                    <label for="mongodbCommand" class="form-label">{{ $t("Command") }}</label>
+                                    <textarea id="mongodbCommand" v-model="monitor.databaseQuery" class="form-control" :placeholder="$t('Example:', [ '{ &quot;ping&quot;: 1 }' ])"></textarea>
+                                    <i18n-t tag="div" class="form-text" keypath="mongodbCommandDescription">
+                                        <template #documentation>
+                                            <a href="https://www.mongodb.com/docs/manual/reference/command/">{{ $t('documentationOf', ['MongoDB']) }}</a>
+                                        </template>
+                                    </i18n-t>
+                                </div>
+                                <div class="my-3">
+                                    <label for="jsonPath" class="form-label">{{ $t("Json Query") }}</label>
+                                    <input id="jsonPath" v-model="monitor.jsonPath" type="text" class="form-control">
+
+                                    <i18n-t tag="div" class="form-text" keypath="jsonQueryDescription">
+                                        <a href="https://jsonata.org/">jsonata.org</a>
+                                        <a href="https://try.jsonata.org/">{{ $t('here') }}</a>
+                                    </i18n-t>
+                                </div>
+                                <div class="my-3">
+                                    <label for="expectedValue" class="form-label">{{ $t("Expected Value") }}</label>
+                                    <input id="expectedValue" v-model="monitor.expectedValue" type="text" class="form-control">
                                 </div>
                             </template>
 
@@ -403,8 +531,8 @@
                                 <input id="retry-interval" v-model="monitor.retryInterval" type="number" class="form-control" required :min="minInterval" step="1">
                             </div>
 
-                            <!-- Timeout: HTTP / Keyword only -->
-                            <div v-if="monitor.type === 'http' || monitor.type === 'keyword' || monitor.type === 'json-query'" class="my-3">
+                            <!-- Timeout: HTTP / Keyword / SNMP only -->
+                            <div v-if="monitor.type === 'http' || monitor.type === 'keyword' || monitor.type === 'json-query' || monitor.type === 'snmp'" class="my-3">
                                 <label for="timeout" class="form-label">{{ $t("Request Timeout") }} ({{ $t("timeoutAfter", [ monitor.timeout || clampTimeout(monitor.interval) ]) }})</label>
                                 <input id="timeout" v-model="monitor.timeout" type="number" class="form-control" required min="0" step="0.1">
                             </div>
@@ -429,10 +557,10 @@
                                 </div>
                             </div>
 
-                            <div v-if="monitor.type === 'http' || monitor.type === 'keyword' || monitor.type === 'json-query' " class="my-3 form-check">
+                            <div v-if="monitor.type === 'http' || monitor.type === 'keyword' || monitor.type === 'json-query' || monitor.type === 'redis' " class="my-3 form-check">
                                 <input id="ignore-tls" v-model="monitor.ignoreTls" class="form-check-input" type="checkbox" value="">
                                 <label class="form-check-label" for="ignore-tls">
-                                    {{ $t("ignoreTLSError") }}
+                                    {{ monitor.type === "redis" ? $t("ignoreTLSErrorGeneral") : $t("ignoreTLSError") }}
                                 </label>
                             </div>
 
@@ -497,9 +625,11 @@
 
                             <!-- Parent Monitor -->
                             <div class="my-3">
-                                <label for="parent" class="form-label">{{ $t("Monitor Group") }}</label>
+                                <label for="monitorGroupSelector" class="form-label">{{ $t("Monitor Group") }}</label>
                                 <ActionSelect
+                                    id="monitorGroupSelector"
                                     v-model="monitor.parent"
+                                    :action-aria-label="$t('openModalTo', 'setup a new monitor group')"
                                     :options="parentMonitorOptionsList"
                                     :disabled="sortedGroupMonitorList.length === 0 && draftGroupName == null"
                                     :icon="'plus'"
@@ -830,6 +960,7 @@
             <DockerHostDialog ref="dockerHostDialog" @added="addedDockerHost" />
             <ProxyDialog ref="proxyDialog" @added="addedProxy" />
             <CreateGroupDialog ref="createGroupDialog" @added="addedDraftGroup" />
+            <RemoteBrowserDialog ref="remoteBrowserDialog" @added="addedRemoteBrowser" />
         </div>
     </transition>
 </template>
@@ -842,11 +973,12 @@ import CopyableInput from "../components/CopyableInput.vue";
 import CreateGroupDialog from "../components/CreateGroupDialog.vue";
 import NotificationDialog from "../components/NotificationDialog.vue";
 import DockerHostDialog from "../components/DockerHostDialog.vue";
+import RemoteBrowserDialog from "../components/RemoteBrowserDialog.vue";
 import ProxyDialog from "../components/ProxyDialog.vue";
 import TagsManager from "../components/TagsManager.vue";
-import { genSecret, isDev, MAX_INTERVAL_SECOND, MIN_INTERVAL_SECOND } from "../util.ts";
+import { genSecret, isDev, MAX_INTERVAL_SECOND, MIN_INTERVAL_SECOND, sleep } from "../util.ts";
 import { hostNameRegexPattern } from "../util-frontend";
-import { sleep } from "../util";
+import HiddenInput from "../components/HiddenInput.vue";
 
 const toast = useToast;
 
@@ -861,8 +993,7 @@ const monitorDefaults = {
     interval: 60,
     retryInterval: 60,
     resendInterval: 0,
-    maxretries: 1,
-    timeout: 48,
+    maxretries: 0,
     notificationIDList: {},
     ignoreTls: false,
     upsideDown: false,
@@ -879,6 +1010,7 @@ const monitorDefaults = {
     mqttPassword: "",
     mqttTopic: "",
     mqttSuccessMessage: "",
+    mqttCheckType: "keyword",
     authMethod: null,
     oauth_auth_method: "client_secret_basic",
     httpBodyEncoding: "json",
@@ -887,17 +1019,21 @@ const monitorDefaults = {
         mechanism: "None",
     },
     kafkaProducerSsl: false,
+    kafkaProducerAllowAutoTopicCreation: false,
     gamedigGivenPortOnly: true,
+    remote_browser: null
 };
 
 export default {
     components: {
+        HiddenInput,
         ActionSelect,
         ProxyDialog,
         CopyableInput,
         CreateGroupDialog,
         NotificationDialog,
         DockerHostDialog,
+        RemoteBrowserDialog,
         TagsManager,
         VueMultiselect,
     },
@@ -925,6 +1061,7 @@ export default {
                 "mongodb": "mongodb://username:password@host:port/database",
             },
             draftGroupName: null,
+            remoteBrowsersEnabled: false,
         };
     },
 
@@ -948,7 +1085,31 @@ export default {
             }
             return this.$t(name);
         },
-
+        remoteBrowsersOptions() {
+            return this.$root.remoteBrowserList.map(browser => {
+                return {
+                    label: browser.name,
+                    value: browser.id,
+                };
+            });
+        },
+        remoteBrowsersToggle: {
+            get() {
+                return this.remoteBrowsersEnabled || this.monitor.remote_browser != null;
+            },
+            set(value) {
+                if (value) {
+                    this.remoteBrowsersEnabled = true;
+                    if (this.monitor.remote_browser == null && this.$root.remoteBrowserList.length > 0) {
+                        // set a default remote browser if there is one. Otherwise, the user will have to select one manually.
+                        this.monitor.remote_browser = this.$root.remoteBrowserList[0].id;
+                    }
+                } else {
+                    this.remoteBrowsersEnabled = false;
+                    this.monitor.remote_browser = null;
+                }
+            }
+        },
         isAdd() {
             return this.$route.path === "/add";
         },
@@ -1044,8 +1205,8 @@ message HealthCheckResponse {
             // Only groups, not itself, not a decendant
             result = result.filter(
                 monitor => monitor.type === "group" &&
-				monitor.id !== this.monitor.id &&
-				!this.monitor.childrenIDs?.includes(monitor.id)
+                monitor.id !== this.monitor.id &&
+                !this.monitor.childrenIDs?.includes(monitor.id)
             );
 
             // Filter result by active state, weight and alphabetical
@@ -1115,6 +1276,21 @@ message HealthCheckResponse {
             return list;
         },
 
+        dockerHostOptionsList() {
+            if (this.$root.dockerHostList && this.$root.dockerHostList.length > 0) {
+                return this.$root.dockerHostList.map((host) => {
+                    return {
+                        label: host.name,
+                        value: host.id
+                    };
+                });
+            } else {
+                return [{
+                    label: this.$t("noDockerHostMsg"),
+                    value: null,
+                }];
+            }
+        }
     },
     watch: {
         "$root.proxyList"() {
@@ -1162,9 +1338,33 @@ message HealthCheckResponse {
                     this.monitor.port = "53";
                 } else if (this.monitor.type === "radius") {
                     this.monitor.port = "1812";
+                } else if (this.monitor.type === "snmp") {
+                    this.monitor.port = "161";
                 } else {
                     this.monitor.port = undefined;
                 }
+            }
+
+            if (this.monitor.type === "snmp") {
+                // snmp is not expected to be executed via the internet => we can choose a lower default timeout
+                this.monitor.timeout = 5;
+            } else {
+                this.monitor.timeout = 48;
+            }
+
+            // Set default SNMP version
+            if (!this.monitor.snmpVersion) {
+                this.monitor.snmpVersion = "2c";
+            }
+
+            // Set default jsonPath
+            if (!this.monitor.jsonPath) {
+                this.monitor.jsonPath = "$";
+            }
+
+            // Set default condition for for jsonPathOperator
+            if (!this.monitor.jsonPathOperator) {
+                this.monitor.jsonPathOperator = "==";
             }
 
             // Get the game list from server
@@ -1293,6 +1493,7 @@ message HealthCheckResponse {
                             // group monitor fields
                             this.monitor.childrenIDs = undefined;
                             this.monitor.forceInactive = undefined;
+                            this.monitor.path = undefined;
                             this.monitor.pathName = undefined;
                             this.monitor.screenshot = undefined;
 
@@ -1352,6 +1553,12 @@ message HealthCheckResponse {
                     return false;
                 }
             }
+            if (this.monitor.type === "docker") {
+                if (this.monitor.docker_host == null) {
+                    toast.error(this.$t("DockerHostRequired"));
+                    return false;
+                }
+            }
             return true;
         },
 
@@ -1361,7 +1568,7 @@ message HealthCheckResponse {
 
         /**
          * Submit the form data for processing
-         * @returns {void}
+         * @returns {Promise<void>}
          */
         async submit() {
 
@@ -1426,7 +1633,7 @@ message HealthCheckResponse {
 
                         // Start the new parent monitor after edit is done
                         if (createdNewParent) {
-                            this.startParentGroupMonitor();
+                            await this.startParentGroupMonitor();
                         }
                         this.processing = false;
                         this.$root.getMonitorList();
